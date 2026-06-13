@@ -1,0 +1,24 @@
+{
+  "name": "codesync-server",
+  "version": "1.0.0",
+  "description": "Collaborative code editor backend server",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.24.0",
+    "dotenv": "^16.4.5",
+    "ws": "^8.18.0",
+    "y-leveldb": "^0.1.2",
+    "y-websocket": "1.5.0",
+    "yjs": "^13.6.15"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.24",
+    "@types/ws": "^8.5.10",
+    "tsx": "^4.7.1",
+    "typescript": "^5.3.3"
+  }
+}
