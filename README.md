@@ -1,75 +1,97 @@
-# codesync-server
+# CodeSync — Server
 
-> Real-time collaborative WebSocket synchronization and LevelDB persistence server for CodeSync.
+> WebSocket backend for CodeSync: real-time document sync, persistence, and sandboxed code execution.
+
+This is the backend for [CodeSync](https://github.com/Maruthi14-gif/codesync-web), a real-time collaborative code editor. It coordinates Yjs document synchronization over WebSockets, persists rooms to disk, and forwards code execution requests to a sandboxed Piston engine.
+
+**Frontend live demo:** https://codesync-web-lake.vercel.app
+
+---
+
+## Features
+
+- **Yjs WebSocket relay** — synchronizes collaborative documents (`y-websocket`) and awareness/presence between all clients in a room.
+- **Persistence** — rooms are stored with `y-leveldb`, so documents survive server restarts.
+- **Code execution endpoint** — `POST /execute` forwards code to a self-hosted Piston sandbox and returns stdout/stderr (see note below).
+- **Room passcodes** — optional server-side access control.
 
 ---
 
 ## Tech Stack
 
-| Technology | Purpose |
-| :--- | :--- |
-| **Node.js + TypeScript** | Core backend server runtime and compilation |
-| **ws** | High-performance WebSocket server for collaborative transport |
-| **tsx** | Fast dev server and execution of TypeScript directly |
-| **Yjs** | CRDT collaborative document framework |
-| **y-websocket** | Synchronization protocol adapter for WebSockets |
-| **y-leveldb** | Local LevelDB persistence adapter for Yjs documents |
-| **dotenv** | Environment configuration management |
+| Layer | Technology |
+|---|---|
+| Runtime | Node.js, TypeScript |
+| WebSocket / sync | `ws`, `yjs`, `y-websocket` |
+| Persistence | `y-leveldb` |
+| Code execution | Self-hosted [Piston](https://github.com/engineer-man/piston) (Docker) |
+| Hosting | Railway |
 
 ---
 
 ## Local Setup
 
-1. **Install Dependencies:**
-   ```bash
-   npm install
-   ```
+```bash
+git clone https://github.com/Maruthi14-gif/codesync-server.git
+cd codesync-server
+npm install
+```
 
-2. **Configure Environment Variables:**
-   Copy the example template and set your values:
-   ```bash
-   cp .env.example .env
-   ```
+Create `.env`:
 
-3. **Start Development Server:**
-   ```bash
-   npm run dev
-   ```
+```
+PORT=1234
+CLIENT_ORIGIN=http://localhost:3000
+PISTON_URL=http://localhost:2000
+```
 
-4. **Build Production Bundle:**
-   ```bash
-   npm run build
-   ```
+Run the dev server:
 
----
+```bash
+npm run dev
+```
 
-## Environment Variables
-
-| Variable | Description | Default | Required |
-| :--- | :--- | :--- | :--- |
-| `PORT` | The network port the HTTP and WebSocket server listens on. | `1234` | No |
+The server starts on `:1234` (WebSocket + HTTP).
 
 ---
 
-## How It Works
+## Enabling Code Execution (Local)
 
-### Yjs CRDT Sync
-The server acts as a central authority for Yjs CRDT (Conflict-free Replicated Data Type) updates. When clients connect, they exchange state vectors over WebSocket. The server applies incoming client updates to in-memory Yjs documents (`Y.Doc`) and broadcasts them to other connected peers in the same room.
+Code execution requires a local [Piston](https://github.com/engineer-man/piston) instance running in Docker.
 
-### LevelDB Persistence
-To prevent data loss when all users disconnect, the server uses `y-leveldb` persistence. When a document is first opened, the server loads its historical updates from LevelDB. As clients make edits, incremental Yjs updates are saved to the LevelDB store on every transaction.
+```bash
+# Pull and run Piston
+docker run -d --name piston_api --privileged -p 2000:2000 ghcr.io/engineer-man/piston
 
-### Multi-surface Document Structure
-The server manages a single `Y.Doc` per room which contains multiple separate shared types:
-- `codemirror`: A `Y.Text` type that holds the collaborative code editor text.
-- `notepad`: A `Y.Text` type that holds the scratchpad/notes content.
+# Install the language runtimes
+curl -X POST http://localhost:2000/api/v2/packages -H "Content-Type: application/json" -d '{"language":"python","version":"3.12.0"}'
+curl -X POST http://localhost:2000/api/v2/packages -H "Content-Type: application/json" -d '{"language":"node","version":"20.11.1"}'
+curl -X POST http://localhost:2000/api/v2/packages -H "Content-Type: application/json" -d '{"language":"gcc","version":"10.2.0"}'
+```
 
-These are independent surfaces that sync independently but reside inside the same unified document structure.
+With Piston running and `PISTON_URL` pointing at it, `POST /execute` returns real compile/run output.
 
 ---
 
-## Demo & Live URL
+## A Note on Production Code Execution
 
-- **Live URL:** *[Insert Live URL Here]*
-- **Demo Preview:**  
-  ![Demo GIF Placeholder](https://via.placeholder.com/800x450.gif?text=Demo+GIF+Placeholder)
+Piston sandboxes untrusted code using **Isolate** (Linux namespaces, cgroups, privileged operations), which requires a **writable filesystem and a privileged container**. Managed hosting platforms (Railway, etc.) run containers as read-only and unprivileged for security, so Piston fails to initialize there (`mkdir: cannot create directory 'isolate/': Read-only file system`).
+
+The deployed backend therefore runs **collaboration and persistence only**; code execution is available when self-hosting on infrastructure with full Docker control (a VPS or local machine). The frontend degrades gracefully on the live demo, showing a friendly notice instead of an error.
+
+---
+
+## API
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/` | GET | Health check |
+| `/execute` | POST | Run code via Piston. Body: `{ language, code, stdin? }` → `{ stdout, stderr, code, signal }` |
+
+WebSocket connections are handled per-room via `y-websocket`.
+
+---
+
+## Related
+
+- Frontend: [codesync-web](https://github.com/Maruthi14-gif/codesync-web)
