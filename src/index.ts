@@ -71,7 +71,7 @@ const server = http.createServer((req, res) => {
 
         // Language map: maps CodeSync languages to Piston runner details
         const languageMap: Record<string, { language: string; version: string; filename: string }> = {
-          javascript: { language: 'node', version: '20.11.1', filename: 'index.js' },
+          javascript: { language: 'javascript', version: '20.11.1', filename: 'index.js' },
           python: { language: 'python', version: '3.12.0', filename: 'main.py' },
           cpp: { language: 'c++', version: '10.2.0', filename: 'main.cpp' },
         };
